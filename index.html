@@ -266,12 +266,12 @@
             <div class="flex flex-col sm:flex-row justify-around items-center mb-4">
                 <div class="flex flex-col items-center">
                     <img id="battle-pokemon1-image" src="" alt="Pokemon 1 Image" class="w-24 h-24 rounded-full border-4 border-blue-500 shadow-lg mb-2">
-                    <div id="battle-pokemon1-name" class="text-lg font-semibold text-blue-600"></div>
+                    <div id="battle-pokemon1-name" class="text-lg font-semibold text-blue-600 text-center"></div>
                 </div>
                 <div class="text-2xl sm:text-3xl font-extrabold text-gray-400 mx-4">vs</div>
                 <div class="flex flex-col items-center">
                     <img id="battle-pokemon2-image" src="" alt="Pokemon 2 Image" class="w-24 h-24 rounded-full border-4 border-red-500 shadow-lg mb-2">
-                    <div id="battle-pokemon2-name" class="text-lg font-semibold text-red-600"></div>
+                    <div id="battle-pokemon2-name" class="text-lg font-semibold text-red-600 text-center"></div>
                 </div>
             </div>
 
@@ -627,8 +627,9 @@
             battlePokemon1Image.src = pokemon1.imageUrl;
             battlePokemon2Image.src = pokemon2.imageUrl;
 
-            battlePokemon1Name.textContent = `${pokemon1.name}`;
-            battlePokemon2Name.textContent = `${pokemon2.name}`;
+            // CORRECTED: Set both Chinese and English names
+            battlePokemon1Name.textContent = `${pokemon1.name} (${pokemon1.englishName})`;
+            battlePokemon2Name.textContent = `${pokemon2.name} (${pokemon2.englishName})`;
             battleLogDiv.innerHTML = '';
             resultDisplay.classList.add('hidden');
 
@@ -818,3 +819,4 @@
     </script>
 </body>
 </html>
+

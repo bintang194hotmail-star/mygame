@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宝可梦对战模拟器 / Pokémon Battle Simulator</title>
+    <!-- Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            @apply text-gray-800;
+            background: linear-gradient(135deg, #f0f9ff, #cbebff);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            width: 100%;
+        }
+        .pokemon-select, .battle-info, .result {
+            background-color: #f1f5f9;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .pokemon-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .pokemon-info img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #60a5fa;
+            object-fit: cover;
+        }
+        .battle-log {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            margin-top: 1rem;
+            font-size: 0.875rem; /* Reduced font size */
+        }
+        .log-entry {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+        .winner-message {
+            color: #166534;
+            font-weight: bold;
+            font-size: 1.25rem;
+            text-align: center;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        @media (min-width: 768px) {
+            .filter-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .result-container {
+            padding: 2rem;
+            border-radius: 1.5rem;
+            text-align: center;
+            margin-top: 1rem;
+            transform: scale(1.1);
+            transition: transform 0.3s ease-in-out;
+            animation: bounceIn 1s ease-out;
+        }
+
+        .result-win {
+            background-color: #dcfce7;
+            border: 4px solid #16a34a;
+        }
+
+        .result-lose {
+            background-color: #fee2e2;
+            border: 4px solid #dc2626;
+        }
+
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Battle Animation Styles */
+        .battle-animation-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .pokemon-sprite-container {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .pokemon-sprite {
+            width: 200px;
+            height: 200px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            animation-duration: 2s;
+            animation-timing-function: ease-out;
+            animation-fill-mode: forwards;
+        }
+        .pokemon-sprite-container.player-container {
+            position: absolute;
+            bottom: 25%;
+            left: 20%;
+        }
+        .pokemon-sprite-container.opponent-container {
+            position: absolute;
+            top: 25%;
+            right: 20%;
+        }
+        .pokemon-sprite.player-sprite {
+            animation-name: slideInPlayer;
+            transform: scaleX(-1); /* Flip horizontally to face opponent */
+        }
+        .pokemon-sprite.opponent-sprite {
+            animation-name: slideInOpponent;
+        }
+        @keyframes slideInPlayer {
+            from { transform: translateX(-100vw) scaleX(-1); }
+            to { transform: translateX(0) scaleX(-1); }
+        }
+        @keyframes slideInOpponent {
+            from { transform: translateX(100vw); }
+            to { transform: translateX(0); }
+        }
+        
+        .battle-pokemon-hp-bar {
+            width: 150px;
+            height: 18px;
+            background-color: #4b5563; /* Gray-600 */
+            border-radius: 9999px;
+            border: 2px solid #1f2937; /* Gray-800 */
+            margin-top: 0.5rem;
+            position: relative;
+        }
+
+        .battle-hp-bar-fill {
+            height: 100%;
+            width: 100%;
+            background-color: #22c55e; /* Green-500 */
+            border-radius: 9999px;
+            transition: width 0.5s ease;
+        }
+        .battle-hp-text {
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-blue-100 min-h-screen flex items-center justify-center p-8">
+
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-blue-800 mb-8 text-center">宝可梦对战模拟器 / Pokémon Battle Simulator</h1>
+        
+        <!-- Instruction Text -->
+        <p id="instruction-text" class="text-center text-lg mb-6">请先选择第一只宝可梦。 / Please select the first Pokémon.</p>
+
+        <!-- Pokemon 1 Selection Section -->
+        <div id="pokemon1-selection-area">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">选择宝可梦 1 / Select Pokémon 1</h2>
+            <div class="filter-grid mb-6">
+                <div>
+                    <label for="pokemon1-filter-type" class="block text-sm font-semibold text-gray-700 mb-1">类型 / Type</label>
+                    <select id="pokemon1-filter-type" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon1-filter-hp" class="block text-sm font-semibold text-gray-700 mb-1">生命值 / HP</label>
+                    <select id="pokemon1-filter-hp" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon1-filter-speed" class="block text-sm font-semibold text-gray-700 mb-1">速度 / Speed</label>
+                    <select id="pokemon1-filter-speed" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon1-filter-attack" class="block text-sm font-semibold text-gray-700 mb-1">攻击力 / Attack</label>
+                    <select id="pokemon1-filter-attack" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon1-filter-defense" class="block text-sm font-semibold text-gray-700 mb-1">防御力 / Defense</label>
+                    <select id="pokemon1-filter-defense" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+            </div>
+            <select id="pokemon1-select" class="w-full p-3 border rounded-lg bg-white shadow-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-pokemon1-btn" class="hidden px-6 py-3 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700 transition-all duration-300 transform hover:scale-105">确认 / Confirm</button>
+                <button id="reset-pokemon1-btn" class="px-6 py-3 bg-gray-400 text-white font-bold rounded-full shadow-lg hover:bg-gray-500 transition-all duration-300 transform hover:scale-105">重置 / Reset</button>
+            </div>
+        </div>
+
+        <!-- Pokemon 2 Selection Section (Initially Hidden) -->
+        <div id="pokemon2-selection-area" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">选择宝可梦 2 / Select Pokémon 2</h2>
+            <div class="filter-grid mb-6">
+                <div>
+                    <label for="pokemon2-filter-type" class="block text-sm font-semibold text-gray-700 mb-1">类型 / Type</label>
+                    <select id="pokemon2-filter-type" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon2-filter-hp" class="block text-sm font-semibold text-gray-700 mb-1">生命值 / HP</label>
+                    <select id="pokemon2-filter-hp" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon2-filter-speed" class="block text-sm font-semibold text-gray-700 mb-1">速度 / Speed</label>
+                    <select id="pokemon2-filter-speed" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon2-filter-attack" class="block text-sm font-semibold text-gray-700 mb-1">攻击力 / Attack</label>
+                    <select id="pokemon2-filter-attack" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div>
+                    <label for="pokemon2-filter-defense" class="block text-sm font-semibold text-gray-700 mb-1">防御力 / Defense</label>
+                    <select id="pokemon2-filter-defense" class="w-full px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+            </div>
+            <select id="pokemon2-select" class="w-full p-3 border rounded-lg bg-white shadow-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+            <div class="flex justify-center space-x-4">
+                <button id="battle-button" class="px-6 py-3 bg-red-600 text-white font-bold rounded-full shadow-lg hover:bg-red-700 transition-all duration-300 transform hover:scale-105">开始对战 / Start Battle</button>
+                <button id="reset-pokemon2-btn" class="px-6 py-3 bg-gray-400 text-white font-bold rounded-full shadow-lg hover:bg-gray-500 transition-all duration-300 transform hover:scale-105">重置 / Reset</button>
+            </div>
+        </div>
+        
+        <!-- Battle Information Section -->
+        <div id="battle-info-section" class="battle-info hidden p-6 rounded-2xl shadow-md bg-white">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">对战信息 / Battle Log</h2>
+            <!-- Pokemon Images and Names Section -->
+            <div class="flex flex-col sm:flex-row justify-around items-center mb-4">
+                <div class="flex flex-col items-center">
+                    <img id="battle-pokemon1-image" src="" alt="Pokemon 1 Image" class="w-24 h-24 rounded-full border-4 border-blue-500 shadow-lg mb-2">
+                    <div id="battle-pokemon1-name" class="text-lg font-semibold text-blue-600"></div>
+                </div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-gray-400 mx-4">vs</div>
+                <div class="flex flex-col items-center">
+                    <img id="battle-pokemon2-image" src="" alt="Pokemon 2 Image" class="w-24 h-24 rounded-full border-4 border-red-500 shadow-lg mb-2">
+                    <div id="battle-pokemon2-name" class="text-lg font-semibold text-red-600"></div>
+                </div>
+            </div>
+
+            <!-- HP Bars Section -->
+            <div class="flex justify-around items-center mb-4">
+                <div class="flex flex-col items-center">
+                    <div class="battle-pokemon-hp-bar">
+                        <div id="battle-hp-bar-p1" class="battle-hp-bar-fill"></div>
+                    </div>
+                    <div id="battle-hp-text-p1" class="battle-hp-text">HP: 100/100</div>
+                </div>
+                <div class="w-8"></div> <!-- Spacer -->
+                <div class="flex flex-col items-center">
+                    <div class="battle-pokemon-hp-bar">
+                        <div id="battle-hp-bar-p2" class="battle-hp-bar-fill"></div>
+                    </div>
+                    <div id="battle-hp-text-p2" class="battle-hp-text">HP: 100/100</div>
+                </div>
+            </div>
+            
+            <div id="battle-log" class="battle-log"></div>
+            
+            <!-- Result Display -->
+            <div id="result-display" class="hidden"></div>
+
+            <div class="mt-8 text-center">
+                <button id="restart-button" class="hidden px-6 py-3 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 transform hover:scale-105">重新开始 / Restart</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- New: Battle Animation Area -->
+    <div id="battle-animation-area" class="battle-animation-area">
+        <div class="pokemon-sprite-container player-container">
+            <div id="player-sprite" class="pokemon-sprite player-sprite"></div>
+        </div>
+        <div class="pokemon-sprite-container opponent-container">
+            <div id="opponent-sprite" class="pokemon-sprite opponent-sprite"></div>
+        </div>
+    </div>
+
+    <script>
+        const pokemonData = [
+            { name: '妙蛙种子', englishName: 'Bulbasaur', types: ['草', '毒'], hp: 45, attack: 49, defense: 49, speed: 45, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', moves: [{name: '藤鞭', englishName: 'Vine Whip', power: 45}, {name: '飞叶快刀', englishName: 'Razor Leaf', power: 55}]},
+            { name: '小火龙', englishName: 'Charmander', types: ['火'], hp: 39, attack: 52, defense: 43, speed: 65, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png', moves: [{name: '火花', englishName: 'Ember', power: 40}, {name: '火焰旋涡', englishName: 'Fire Spin', power: 35}]},
+            { name: '杰尼龟', englishName: 'Squirtle', types: ['水'], hp: 44, attack: 48, defense: 65, speed: 43, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png', moves: [{name: '水枪', englishName: 'Water Gun', power: 40}, {name: '水流喷射', englishName: 'Aqua Jet', power: 40}]},
+            { name: '皮卡丘', englishName: 'Pikachu', types: ['电'], hp: 35, attack: 55, defense: 40, speed: 90, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png', moves: [{name: '十万伏特', englishName: 'Thunderbolt', power: 90}, {name: '电球', englishName: 'Electro Ball', power: 60}]},
+            { name: '喷火龙', englishName: 'Charizard', types: ['火', '飞行'], hp: 78, attack: 84, defense: 78, speed: 100, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png', moves: [{name: '喷射火焰', englishName: 'Flamethrower', power: 90}, {name: '大字爆炎', englishName: 'Blast Burn', power: 110}]},
+            { name: '水箭龟', englishName: 'Blastoise', types: ['水'], hp: 79, attack: 83, defense: 100, speed: 78, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png', moves: [{name: '水炮', englishName: 'Hydro Pump', power: 110}, {name: '急冻光线', englishName: 'Ice Beam', power: 90}]},
+            { name: '妙蛙花', englishName: 'Venusaur', types: ['草', '毒'], hp: 80, attack: 82, defense: 83, speed: 80, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png', moves: [{name: '飞叶风暴', englishName: 'Leaf Storm', power: 130}, {name: '污泥炸弹', englishName: 'Sludge Bomb', power: 90}]},
+            { name: '暴鲤龙', englishName: 'Gyarados', types: ['水', '飞行'], hp: 95, attack: 125, defense: 79, speed: 81, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/130.png', moves: [{name: '水流尾', englishName: 'Aqua Tail', power: 90}, {name: '龙之怒', englishName: 'Dragon Rage', power: 60}]},
+            { name: '卡比兽', englishName: 'Snorlax', types: ['一般'], hp: 160, attack: 110, defense: 65, speed: 30, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/143.png', moves: [{name: '泰山压顶', englishName: 'Body Slam', power: 85}, {name: '地震', englishName: 'Earthquake', power: 100}]},
+            { name: '超梦', englishName: 'Mewtwo', types: ['超能力'], hp: 106, attack: 110, defense: 90, speed: 130, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/150.png', moves: [{name: '精神强念', englishName: 'Psychic', power: 90}, {name: '波导弹', englishName: 'Aura Sphere', power: 80}]},
+            { name: '快龙', englishName: 'Dragonite', types: ['龙', '飞行'], hp: 91, attack: 134, defense: 95, speed: 80, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/149.png', moves: [{name: '逆鳞', englishName: 'Outrage', power: 120}, {name: '龙之爪', englishName: 'Dragon Claw', power: 80}]},
+            { name: '耿鬼', englishName: 'Gengar', types: ['幽灵', '毒'], hp: 60, attack: 65, defense: 60, speed: 110, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/94.png', moves: [{name: '暗影球', englishName: 'Shadow Ball', power: 80}, {name: '污泥炸弹', englishName: 'Sludge Bomb', power: 90}]},
+            { name: '怪力', englishName: 'Machamp', types: ['格斗'], hp: 90, attack: 130, defense: 80, speed: 55, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/68.png', moves: [{name: '十字劈', englishName: 'Cross Chop', power: 100}, {name: '爆裂拳', englishName: 'Dynamic Punch', power: 100}]},
+            { name: '风速狗', englishName: 'Arcanine', types: ['火'], hp: 90, attack: 110, defense: 80, speed: 95, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/59.png', moves: [{name: '神速', englishName: 'Extreme Speed', power: 80}, {name: '闪焰冲锋', englishName: 'Flare Blitz', power: 120}]},
+            { name: '水伊布', englishName: 'Vaporeon', types: ['水'], hp: 130, attack: 65, defense: 60, speed: 65, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/134.png', moves: [{name: '冲浪', englishName: 'Surf', power: 90}, {name: '水流环', englishName: 'Aqua Ring', power: 0}]},
+            { name: '雷伊布', englishName: 'Jolteon', types: ['电'], hp: 65, attack: 65, defense: 60, speed: 130, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/135.png', moves: [{name: '打雷', englishName: 'Thunder', power: 110}, {name: '放电', englishName: 'Discharge', power: 80}]},
+            { name: '火伊布', englishName: 'Flareon', types: ['火'], hp: 65, attack: 130, defense: 60, speed: 65, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/136.png', moves: [{name: '闪焰冲锋', englishName: 'Flare Blitz', power: 120}, {name: '大字爆炎', englishName: 'Blast Burn', power: 110}]},
+            { name: '班吉拉', englishName: 'Tyranitar', types: ['岩石', '恶'], hp: 100, attack: 134, defense: 110, speed: 61, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/248.png', moves: [{name: '尖石攻击', englishName: 'Stone Edge', power: 100}, {name: '咬碎', englishName: 'Crunch', power: 80}]},
+            { name: '巨金怪', englishName: 'Metagross', types: ['钢', '超能力'], hp: 80, attack: 135, defense: 130, speed: 70, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/376.png', moves: [{name: '彗星拳', englishName: 'Meteor Mash', power: 90}, {name: '意念头锤', englishName: 'Zen Headbutt', power: 80}]},
+            { name: '胡地', englishName: 'Alakazam', types: ['超能力'], hp: 55, attack: 50, defense: 45, speed: 120, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/65.png', moves: [{name: '精神强念', englishName: 'Psychic', power: 90}, {name: '魔法闪耀', englishName: 'Dazzling Gleam', power: 80}]},
+            { name: '固拉多', englishName: 'Groudon', types: ['地面'], hp: 100, attack: 150, defense: 140, speed: 90, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/383.png', moves: [{name: '断崖之剑', englishName: 'Precipice Blades', power: 120}, {name: '地震', englishName: 'Earthquake', power: 100}]},
+            { name: '奈克洛兹玛', englishName: 'Necrozma', types: ['超能力'], hp: 97, attack: 107, defense: 101, speed: 79, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/796.png', moves: [{name: '棱镜激光', englishName: 'Prismatic Laser', power: 160}, {name: '流星闪冲', englishName: 'Photon Geyser', power: 100}]},
+            { name: '索尔迦雷欧', englishName: 'Solgaleo', types: ['超能力', '钢'], hp: 137, attack: 137, defense: 107, speed: 97, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/791.png', moves: [{name: '流星闪冲', englishName: 'Photon Geyser', power: 100}, {name: '日光束', englishName: 'Solar Beam', power: 120}]},
+            { name: '达克莱伊', englishName: 'Darkrai', types: ['恶'], hp: 70, attack: 90, defense: 90, speed: 125, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/491.png', moves: [{name: '暗黑洞', englishName: 'Dark Void', power: 0}, {name: '恶之波动', englishName: 'Dark Pulse', power: 80}]},
+            { name: '火焰鸟', englishName: 'Moltres', types: ['火', '飞行'], hp: 90, attack: 100, defense: 90, speed: 90, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/146.png', moves: [{name: '大字爆炎', englishName: 'Blast Burn', power: 110}, {name: '热风', englishName: 'Heat Wave', power: 95}]},
+            { name: '魔灵珊瑚', englishName: 'Cursola', types: ['幽灵'], hp: 60, attack: 95, defense: 50, speed: 30, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/864.png', moves: [{name: '暗影球', englishName: 'Shadow Ball', power: 80}, {name: '力量宝石', englishName: 'Power Gem', power: 80}]},
+            { name: '故勒顿', englishName: 'Koraidon', types: ['格斗', '龙'], hp: 100, attack: 135, defense: 115, speed: 135, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1007.png', moves: [{name: '逆鳞', englishName: 'Outrage', power: 120}, {name: '近身战', englishName: 'Close Combat', power: 120}]},
+            { name: '密勒顿', englishName: 'Miraidon', types: ['电', '龙'], hp: 100, attack: 135, defense: 115, speed: 135, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1008.png', moves: [{name: '龙之波动', englishName: 'Dragon Pulse', power: 85}, {name: '闪电', englishName: 'Thunder', power: 90}]},
+            { name: '轰擂金刚猩', englishName: 'Rillaboom', types: ['草'], hp: 100, attack: 125, defense: 90, speed: 85, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/812.png', moves: [{name: '木槌', englishName: 'Wood Hammer', power: 120}, {name: '木叶锤', englishName: 'Leaf Blade', power: 100}]},
+            { name: '焚焰蚣', englishName: 'Centiskorch', types: ['火', '虫'], hp: 100, attack: 115, defense: 65, speed: 65, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/851.png', moves: [{name: '大字爆炎', englishName: 'Blast Burn', power: 110}, {name: '虫之抵抗', englishName: 'Struggle Bug', power: 50}]},
+            { name: '飞腿郎', englishName: 'Hitmonlee', types: ['格斗'], hp: 50, attack: 120, defense: 53, speed: 87, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/106.png', moves: [{name: '飞膝踢', englishName: 'High Jump Kick', power: 130}, {name: '百万吨飞踢', englishName: 'Mega Kick', power: 120}]},
+            { name: '帕路奇亚', englishName: 'Palkia', types: ['水', '龙'], hp: 90, attack: 120, defense: 100, speed: 100, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/484.png', moves: [{name: '亚空裂斩', englishName: 'Spacial Rend', power: 100}, {name: '水流尾', englishName: 'Aqua Tail', power: 90}]},
+            { name: '烈咬陆鲨', englishName: 'Garchomp', types: ['龙', '地面'], hp: 108, attack: 130, defense: 95, speed: 102, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/445.png', moves: [{name: '龙爪', englishName: 'Dragon Claw', power: 80}, {name: '地震', englishName: 'Earthquake', power: 100}]},
+            { name: '阿尔宙斯', englishName: 'Arceus', types: ['一般'], hp: 120, attack: 120, defense: 120, speed: 120, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/493.png', moves: [{name: '制裁石砾', englishName: 'Judgment', power: 100}, {name: '神圣之火', englishName: 'Sacred Fire', power: 100}]},
+            { name: '火焰鸡', englishName: 'Blaziken', types: ['火', '格斗'], hp: 80, attack: 120, defense: 70, speed: 80, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/257.png', moves: [{name: '火焰踢', englishName: 'Blaze Kick', power: 85}, {name: '飞膝踢', englishName: 'High Jump Kick', power: 130}]},
+            { name: '奈克洛兹玛（究极形态）', englishName: 'Ultra Necrozma', types: ['超能力', '龙'], hp: 97, attack: 167, defense: 97, speed: 129, imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10185.png', moves: [{name: '棱镜激光', englishName: 'Prismatic Laser', power: 160}, {name: '流星闪冲', englishName: 'Photon Geyser', power: 100}]},
+        ];
+
+        // Type effectiveness table
+        const typeEffectiveness = {
+            '火': { '草': 2, '冰': 2, '虫': 2, '钢': 2, '水': 0.5, '火': 0.5, '岩石': 0.5, '龙': 0.5 },
+            '水': { '火': 2, '地面': 2, '岩石': 2, '水': 0.5, '草': 0.5, '龙': 0.5 },
+            '草': { '水': 2, '地面': 2, '岩石': 2, '火': 0.5, '草': 0.5, '毒': 0.5, '飞行': 0.5, '虫': 0.5, '龙': 0.5, '钢': 0.5 },
+            '电': { '水': 2, '飞行': 2, '草': 0.5, '电': 0.5, '龙': 0.5, '地面': 0 },
+            '格斗': { '一般': 2, '岩石': 2, '钢': 2, '冰': 2, '恶': 2, '毒': 0.5, '飞行': 0.5, '超能力': 0.5, '虫': 0.5, '妖精': 0.5, '幽灵': 0 },
+            '超能力': { '格斗': 2, '毒': 2, '钢': 0.5, '超能力': 0.5, '恶': 0 },
+            '岩石': { '火': 2, '冰': 2, '飞行': 2, '虫': 2, '格斗': 0.5, '地面': 0.5, '钢': 0.5 },
+            '地面': { '火': 2, '电': 2, '毒': 2, '岩石': 2, '钢': 2, '草': 0.5, '虫': 0.5, '飞行': 0 },
+            '龙': { '龙': 2, '钢': 0.5, '妖精': 0 },
+            '毒': { '草': 2, '妖精': 2, '毒': 0.5, '地面': 0.5, '岩石': 0.5, '幽灵': 0.5, '钢': 0 },
+            '飞行': { '格斗': 2, '虫': 2, '草': 2, '岩石': 0.5, '钢': 0.5, '电': 0.5 },
+            '幽灵': { '幽灵': 2, '超能力': 2, '恶': 0.5, '一般': 0 },
+            '钢': { '岩石': 2, '冰': 2, '妖精': 2, '火': 0.5, '水': 0.5, '电': 0.5, '钢': 0.5 },
+            '恶': { '超能力': 2, '幽灵': 2, '格斗': 0.5, '恶': 0.5, '妖精': 0.5 },
+            '一般': { '格斗': 0.5, '幽灵': 0 },
+            '虫': { '草': 2, '超能力': 2, '恶': 2, '格斗': 0.5, '飞行': 0.5, '毒': 0.5, '幽灵': 0.5, '钢': 0.5, '火': 0.5, '妖精': 0.5 },
+            '冰': { '草': 2, '地面': 2, '飞行': 2, '龙': 2, '火': 0.5, '水': 0.5, '冰': 0.5, '钢': 0.5 },
+            '妖精': { '格斗': 2, '龙': 2, '恶': 2, '火': 0.5, '毒': 0.5, '钢': 0.5 }
+        };
+
+        const typeEnglishNames = {
+            '火': 'Fire', '水': 'Water', '草': 'Grass', '电': 'Electric', '格斗': 'Fighting', '飞行': 'Flying', '龙': 'Dragon',
+            '超能力': 'Psychic', '一般': 'Normal', '毒': 'Poison', '岩石': 'Rock', '地面': 'Ground', '幽灵': 'Ghost',
+            '钢': 'Steel', '恶': 'Dark', '冰': 'Ice', '虫': 'Bug', '妖精': 'Fairy'
+        };
+
+        const statEnglishNames = { '高': 'High', '中': 'Medium', '低': 'Low' };
+        
+        // Stat thresholds
+        const statThresholds = {
+            'hp': { 'high': 100, 'medium': 60, 'low': 0 },
+            'speed': { 'high': 90, 'medium': 60, 'low': 0 },
+            'attack': { 'high': 110, 'medium': 80, 'low': 0 },
+            'defense': { 'high': 90, 'medium': 60, 'low': 0 }
+        };
+
+        // DOM Elements
+        const instructionText = document.getElementById('instruction-text');
+        const pokemon1SelectionArea = document.getElementById('pokemon1-selection-area');
+        const pokemon2SelectionArea = document.getElementById('pokemon2-selection-area');
+        const pokemon1Select = document.getElementById('pokemon1-select');
+        const pokemon2Select = document.getElementById('pokemon2-select');
+        const confirmPokemon1Btn = document.getElementById('confirm-pokemon1-btn');
+        const resetPokemon1Btn = document.getElementById('reset-pokemon1-btn');
+        const battleButton = document.getElementById('battle-button');
+        const resetPokemon2Btn = document.getElementById('reset-pokemon2-btn');
+        const restartButton = document.getElementById('restart-button');
+        const battleInfoSection = document.getElementById('battle-info-section');
+        // New: DOM elements for images
+        const battlePokemon1Image = document.getElementById('battle-pokemon1-image');
+        const battlePokemon2Image = document.getElementById('battle-pokemon2-image');
+        const battlePokemon1Name = document.getElementById('battle-pokemon1-name');
+        const battlePokemon2Name = document.getElementById('battle-pokemon2-name');
+        const battleLogDiv = document.getElementById('battle-log');
+        const resultDisplay = document.getElementById('result-display');
+        const battleAnimationArea = document.getElementById('battle-animation-area');
+        const playerSprite = document.getElementById('player-sprite');
+        const opponentSprite = document.getElementById('opponent-sprite');
+        const battleHpBarP1 = document.getElementById('battle-hp-bar-p1');
+        const battleHpTextP1 = document.getElementById('battle-hp-text-p1');
+        const battleHpBarP2 = document.getElementById('battle-hp-bar-p2');
+        const battleHpTextP2 = document.getElementById('battle-hp-text-p2');
+
+        const filterSets = {
+            '1': {
+                type: document.getElementById('pokemon1-filter-type'),
+                hp: document.getElementById('pokemon1-filter-hp'),
+                speed: document.getElementById('pokemon1-filter-speed'),
+                attack: document.getElementById('pokemon1-filter-attack'),
+                defense: document.getElementById('pokemon1-filter-defense')
+            },
+            '2': {
+                type: document.getElementById('pokemon2-filter-type'),
+                hp: document.getElementById('pokemon2-filter-hp'),
+                speed: document.getElementById('pokemon2-filter-speed'),
+                attack: document.getElementById('pokemon2-filter-attack'),
+                defense: document.getElementById('pokemon2-filter-defense')
+            }
+        };
+
+        let selectedPokemon1Name = null;
+        let pokemon1, pokemon2;
+
+        function populateFilterSelects() {
+            const allTypes = [...new Set(pokemonData.flatMap(p => p.types))].sort();
+            const statOptions = ['高', '中', '低'];
+            
+            ['1', '2'].forEach(id => {
+                const filterSet = filterSets[id];
+                const typeSelect = filterSet.type;
+                typeSelect.innerHTML = '<option value="全部">全部 / All</option>';
+                allTypes.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = `${type} / ${typeEnglishNames[type] || type}`;
+                    typeSelect.appendChild(option);
+                });
+                
+                ['hp', 'speed', 'attack', 'defense'].forEach(stat => {
+                    filterSet[stat].innerHTML = '<option value="全部">全部 / All</option>';
+                    statOptions.forEach(optionText => {
+                        const option = document.createElement('option');
+                        option.value = optionText;
+                        option.textContent = `${optionText} / ${statEnglishNames[optionText]}`;
+                        filterSet[stat].appendChild(option);
+                    });
+                });
+            });
+        }
+        
+        function filterPokemon(filters, excludeName = null) {
+            return pokemonData.filter(p => {
+                const typeMatch = filters.type === '全部' || p.types.includes(filters.type);
+                const hpMatch = filters.hp === '全部' || (filters.hp === '高' && p.hp >= statThresholds.hp.high) || (filters.hp === '中' && p.hp >= statThresholds.hp.medium && p.hp < statThresholds.hp.high) || (filters.hp === '低' && p.hp < statThresholds.hp.medium);
+                const speedMatch = filters.speed === '全部' || (filters.speed === '高' && p.speed >= statThresholds.speed.high) || (filters.speed === '中' && p.speed >= statThresholds.speed.medium && p.speed < statThresholds.speed.high) || (filters.speed === '低' && p.speed < statThresholds.speed.medium);
+                const attackMatch = filters.attack === '全部' || (filters.attack === '高' && p.attack >= statThresholds.attack.high) || (filters.attack === '中' && p.attack >= statThresholds.attack.medium && p.attack < statThresholds.attack.high) || (filters.attack === '低' && p.attack < statThresholds.attack.medium);
+                const defenseMatch = filters.defense === '全部' || (filters.defense === '高' && p.defense >= statThresholds.defense.high) || (filters.defense === '中' && p.defense >= statThresholds.defense.medium && p.defense < statThresholds.defense.high) || (filters.defense === '低' && p.defense < statThresholds.defense.medium);
+                const excludeMatch = excludeName ? p.name !== excludeName : true;
+                return typeMatch && hpMatch && speedMatch && attackMatch && defenseMatch && excludeMatch;
+            }).sort((a, b) => a.englishName.localeCompare(b.englishName, 'en-US'));
+        }
+
+        function populatePokemonSelect(selectElement, pokemons) {
+            selectElement.innerHTML = '';
+            if (pokemons.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '没有宝可梦符合条件 / No Pokémon match criteria';
+                selectElement.appendChild(option);
+            } else {
+                pokemons.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.name;
+                    option.textContent = `${p.name} (${p.englishName})`;
+                    selectElement.appendChild(option);
+                });
+            }
+        }
+
+        function checkConfirmButton(selectElement, buttonElement) {
+            if (selectElement.value) {
+                buttonElement.classList.remove('hidden');
+            } else {
+                buttonElement.classList.add('hidden');
+            }
+        }
+
+        function logBattle(message) {
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = message;
+            logEntry.classList.add('log-entry');
+            battleLogDiv.appendChild(logEntry);
+            battleLogDiv.scrollTop = battleLogDiv.scrollHeight;
+        }
+
+        function calculateDamage(attacker, defender) {
+            const attackerMove = attacker.moves[Math.floor(Math.random() * attacker.moves.length)];
+            let effectiveness = 1;
+            attacker.types.forEach(atkType => {
+                defender.types.forEach(defType => {
+                    const typeMap = typeEffectiveness[atkType];
+                    if (typeMap && typeMap[defType] !== undefined) {
+                        effectiveness *= typeMap[defType];
+                    }
+                });
+            });
+            const damage = Math.floor(0.5 * attacker.attack * (attackerMove.power / defender.defense) * effectiveness) + 1;
+            let logMessage = `<b>${attacker.name}</b> 使用了招式 "<b>${attackerMove.name}</b>"！`;
+            let logMessageEn = `<b>${attacker.englishName}</b> used the move "<b>${attackerMove.englishName}</b>"!`;
+
+            if (effectiveness >= 2) {
+                logMessage += " <span class='text-green-600 font-bold'>效果绝佳！</span>";
+                logMessageEn += " <span class='text-green-600 font-bold'>It's Super Effective!</span>";
+            } else if (effectiveness <= 0.5) {
+                logMessage += " <span class='text-red-600 font-bold'>效果不佳...</span>";
+                logMessageEn += " <span class='text-red-600 font-bold'>It's Not Very Effective...</span>";
+            } else if (effectiveness === 0) {
+                logMessage += " <span class='text-red-800 font-bold'>没有效果！</span>";
+                logMessageEn += " <span class='text-red-800 font-bold'>It had No Effect!</span>";
+            }
+
+            logMessage += ` 对 <b>${defender.name}</b> 造成了 ${damage} 点伤害。`;
+            logMessageEn += ` It dealt ${damage} damage to <b>${defender.englishName}</b>.`;
+
+            return { damage, logMessage: logMessage + '<br>' + logMessageEn };
+        }
+
+        function getWinnerSummary(winner, loser) {
+            let summaryCn = `<b>${winner.name}</b> 赢得了对战，`;
+            let summaryEn = `<b>${winner.englishName}</b> won the battle. `;
+
+            if (winner.speed > loser.speed) {
+                summaryCn += `凭借更快的速度，率先发动了致命攻击。`;
+                summaryEn += `By leveraging its superior speed, it was able to land a fatal first strike.`;
+            } else if (winner.attack > loser.attack) {
+                summaryCn += `凭借强大的攻击力，成功击败了对手。`;
+                summaryEn += `By leveraging its immense attack power, it successfully defeated the opponent.`;
+            } else if (winner.defense > loser.defense) {
+                summaryCn += `凭借坚实的防御力，有效削弱了对手的攻势。`;
+                summaryEn += `By leveraging its solid defense, it effectively weakened the opponent's offensive.`;
+            } else if (winner.hp > loser.hp) {
+                summaryCn += `凭借更高的生命值，在持久战中笑到了最后。`;
+                summaryEn += `By leveraging its higher HP, it outlasted the opponent in a prolonged battle.`;
+            } else {
+                summaryCn += `经过激烈的交锋，最终取得了胜利。`;
+                summaryEn += `After an intense clash, it ultimately emerged victorious.`;
+            }
+            return { summaryCn, summaryEn };
+        }
+
+        function displayResult(winner) {
+            let messageCn = '';
+            let messageEn = '';
+            let className = '';
+            
+            const summary = getWinnerSummary(winner, winner === pokemon1 ? pokemon2 : pokemon1);
+
+            if (winner) {
+                messageCn = `恭喜你，${winner.name} 赢得了对战！`;
+                messageEn = `Congratulations, ${winner.englishName} won the battle!`;
+                className = 'result-win';
+            } else {
+                messageCn = `很遗憾，对战失败了。`;
+                messageEn = `Unfortunately, the battle was lost.`;
+                className = 'result-lose';
+            }
+
+            resultDisplay.innerHTML = `<p class="text-3xl font-bold mb-2">${messageCn}</p><p class="text-3xl font-bold mb-2">${messageEn}</p><p class="text-lg">${summary.summaryCn}</p><p class="text-lg">${summary.summaryEn}</p>`;
+            resultDisplay.classList.add('result-container', className);
+            resultDisplay.classList.remove('hidden');
+        }
+        
+        async function startBattle() {
+            const pokemon1Name = pokemon1Select.value;
+            const pokemon2Name = pokemon2Select.value;
+
+            if (!pokemon1Name || !pokemon2Name) {
+                logBattle("请选择两只宝可梦。 / Please select two Pokémon.");
+                return;
+            }
+            if (pokemon1Name === pokemon2Name) {
+                logBattle("请选择两只不同的宝可梦。 / Please select two different Pokémon.");
+                return;
+            }
+
+            // Prepare the pokemon objects with their current HP
+            pokemon1 = { ...pokemonData.find(p => p.name === pokemon1Name), currentHp: pokemonData.find(p => p.name === pokemon1Name).hp };
+            pokemon2 = { ...pokemonData.find(p => p.name === pokemon2Name), currentHp: pokemonData.find(p => p.name === pokemon2Name).hp };
+
+            // Hide the selection areas and show the animation area
+            instructionText.classList.add('hidden');
+            pokemon1SelectionArea.classList.add('hidden');
+            pokemon2SelectionArea.classList.add('hidden');
+            battleInfoSection.classList.add('hidden');
+            battleAnimationArea.style.display = 'flex';
+
+            // Set background images for the sprites
+            playerSprite.style.backgroundImage = `url('${pokemon1.imageUrl}')`;
+            opponentSprite.style.backgroundImage = `url('${pokemon2.imageUrl}')`;
+            
+            // Wait for the animation to complete
+            await new Promise(resolve => setTimeout(resolve, 2500));
+
+            // Hide the animation area and show the battle log
+            battleAnimationArea.style.display = 'none';
+            battleInfoSection.classList.remove('hidden');
+            
+            // Set Pokemon images in the battle info section
+            battlePokemon1Image.src = pokemon1.imageUrl;
+            battlePokemon2Image.src = pokemon2.imageUrl;
+
+            battlePokemon1Name.textContent = `${pokemon1.name}`;
+            battlePokemon2Name.textContent = `${pokemon2.name}`;
+            battleLogDiv.innerHTML = '';
+            resultDisplay.classList.add('hidden');
+
+            // Set initial HP for the battle log HP bars and text
+            battleHpBarP1.style.width = '100%';
+            battleHpBarP2.style.width = '100%';
+            battleHpBarP1.style.backgroundColor = '#22c55e';
+            battleHpBarP2.style.backgroundColor = '#22c55e';
+            battleHpTextP1.textContent = `HP: ${pokemon1.currentHp}/${pokemon1.hp}`;
+            battleHpTextP2.textContent = `HP: ${pokemon2.currentHp}/${pokemon2.hp}`;
+
+
+            logBattle(`对战开始！<b>${pokemon1.name}</b> vs <b>${pokemon2.name}</b>！<br>Battle begins! <b>${pokemon1.englishName}</b> vs <b>${pokemon2.englishName}</b>!`);
+            
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            let currentPokemon1 = { ...pokemon1 };
+            let currentPokemon2 = { ...pokemon2 };
+
+            let turn = 1;
+            while (currentPokemon1.currentHp > 0 && currentPokemon2.currentHp > 0 && turn < 50) {
+                
+                let attacker, defender, attackerHpBar, defenderHpBar, defenderHpText;
+                if (currentPokemon1.speed >= currentPokemon2.speed) {
+                    attacker = currentPokemon1;
+                    defender = currentPokemon2;
+                    attackerHpBar = battleHpBarP1;
+                    defenderHpBar = battleHpBarP2;
+                    defenderHpText = battleHpTextP2;
+                } else {
+                    attacker = currentPokemon2;
+                    defender = currentPokemon1;
+                    attackerHpBar = battleHpBarP2;
+                    defenderHpBar = battleHpBarP1;
+                    defenderHpText = battleHpTextP1;
+                }
+
+                // Attacker's turn
+                const { damage: atkDamage, logMessage: atkLog } = calculateDamage(attacker, defender);
+                defender.currentHp -= atkDamage;
+                logBattle(`<b>第 ${turn} 回合 / Turn ${turn}:</b>`);
+                logBattle(atkLog);
+                
+                // Update defender's HP bar
+                const percentage = Math.max(0, Math.min(100, (defender.currentHp / defender.hp) * 100));
+                defenderHpBar.style.width = `${percentage}%`;
+                if (percentage < 25) {
+                    defenderHpBar.style.backgroundColor = '#ef4444'; // Red-500
+                } else if (percentage < 50) {
+                    defenderHpBar.style.backgroundColor = '#f59e0b'; // Amber-500
+                } else {
+                    defenderHpBar.style.backgroundColor = '#22c55e'; // Green-500
+                }
+                defenderHpText.textContent = `HP: ${Math.max(0, defender.currentHp)}/${defender.hp}`;
+
+
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Check for win
+                if (defender.currentHp <= 0) {
+                    break;
+                }
+
+                // Defender's turn
+                [attacker, defender] = [defender, attacker];
+                [attackerHpBar, defenderHpBar] = [defenderHpBar, attackerHpBar];
+                defenderHpText = (defender === currentPokemon1) ? battleHpTextP1 : battleHpTextP2;
+
+                const { damage: defDamage, logMessage: defLog } = calculateDamage(attacker, defender);
+                defender.currentHp -= defDamage;
+                logBattle(`<b>第 ${turn} 回合 / Turn ${turn}:</b>`);
+                logBattle(defLog);
+
+                const defPercentage = Math.max(0, Math.min(100, (defender.currentHp / defender.hp) * 100));
+                defenderHpBar.style.width = `${defPercentage}%`;
+                 if (defPercentage < 25) {
+                    defenderHpBar.style.backgroundColor = '#ef4444';
+                } else if (defPercentage < 50) {
+                    defenderHpBar.style.backgroundColor = '#f59e0b';
+                } else {
+                    defenderHpBar.style.backgroundColor = '#22c55e';
+                }
+                defenderHpText.textContent = `HP: ${Math.max(0, defender.currentHp)}/${defender.hp}`;
+
+                turn++;
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Faster result display
+            
+            const winner = currentPokemon1.currentHp > 0 ? pokemon1 : (currentPokemon2.currentHp > 0 ? pokemon2 : null);
+
+            if (winner) {
+                displayResult(winner);
+            } else {
+                logBattle(`--- 对战结束！ ---`);
+                logBattle(`--- Battle concluded! ---`);
+                logBattle(`平局！`);
+                logBattle(`It's a draw!`);
+            }
+            
+            restartButton.classList.remove('hidden');
+        }
+        
+        function restartGame() {
+            instructionText.classList.remove('hidden');
+            instructionText.textContent = "请先选择第一只宝可梦。 / Please select the first Pokémon.";
+            pokemon1SelectionArea.classList.remove('hidden');
+            pokemon2SelectionArea.classList.add('hidden');
+            battleInfoSection.classList.add('hidden');
+            confirmPokemon1Btn.classList.add('hidden');
+            restartButton.classList.add('hidden');
+            
+            // Reset filters and selects
+            ['1', '2'].forEach(id => {
+                for (const key in filterSets[id]) {
+                    filterSets[id][key].value = '全部';
+                }
+            });
+            // Populate select with all pokemons initially, sorted by English name
+            populatePokemonSelect(pokemon1Select, filterPokemon({}));
+            
+            // Re-bind change listeners
+            pokemon1Select.addEventListener('change', () => checkConfirmButton(pokemon1Select, confirmPokemon1Btn));
+            pokemon2Select.addEventListener('change', () => checkConfirmButton(pokemon2Select, battleButton));
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            populateFilterSelects();
+            
+            // Set initial options for pokemon1
+            populatePokemonSelect(pokemon1Select, filterPokemon({}));
+            checkConfirmButton(pokemon1Select, confirmPokemon1Btn);
+            
+            // Handle filter changes
+            for (const key in filterSets['1']) {
+                filterSets['1'][key].addEventListener('change', () => {
+                    const filters = {};
+                    for (const fKey in filterSets['1']) { filters[fKey] = filterSets['1'][fKey].value; }
+                    populatePokemonSelect(pokemon1Select, filterPokemon(filters));
+                    checkConfirmButton(pokemon1Select, confirmPokemon1Btn);
+                });
+            }
+            
+            for (const key in filterSets['2']) {
+                filterSets['2'][key].addEventListener('change', () => {
+                    const filters = {};
+                    for (const fKey in filterSets['2']) { filters[fKey] = filterSets['2'][fKey].value; }
+                    populatePokemonSelect(pokemon2Select, filterPokemon(filters, selectedPokemon1Name));
+                    checkConfirmButton(pokemon2Select, battleButton);
+                });
+            }
+
+            resetPokemon1Btn.addEventListener('click', () => {
+                for (const key in filterSets['1']) {
+                    filterSets['1'][key].value = '全部';
+                }
+                populatePokemonSelect(pokemon1Select, filterPokemon({}));
+                checkConfirmButton(pokemon1Select, confirmPokemon1Btn);
+            });
+
+            resetPokemon2Btn.addEventListener('click', () => {
+                for (const key in filterSets['2']) {
+                    filterSets['2'][key].value = '全部';
+                }
+                populatePokemonSelect(pokemon2Select, filterPokemon({}, selectedPokemon1Name));
+                checkConfirmButton(pokemon2Select, battleButton);
+            });
+            
+            confirmPokemon1Btn.addEventListener('click', () => {
+                selectedPokemon1Name = pokemon1Select.value;
+                if (selectedPokemon1Name) {
+                    pokemon1SelectionArea.classList.add('hidden');
+                    pokemon2SelectionArea.classList.remove('hidden');
+                    const pokemonName = pokemonData.find(p => p.name === selectedPokemon1Name);
+                    instructionText.textContent = `您选择了 ${pokemonName.name} (${pokemonName.englishName})。现在请选择第二只宝可梦。 / You have selected ${pokemonName.name} (${pokemonName.englishName}). Now please choose the second Pokémon.`;
+                    const filteredPokemons = filterPokemon({}, selectedPokemon1Name);
+                    populatePokemonSelect(pokemon2Select, filteredPokemons);
+                    checkConfirmButton(pokemon2Select, battleButton);
+                }
+            });
+
+            battleButton.addEventListener('click', startBattle);
+            restartButton.addEventListener('click', restartGame);
+        });
+    </script>
+</body>
+</html>
